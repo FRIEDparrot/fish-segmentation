@@ -2,18 +2,18 @@ import numpy as np
 from torch.utils.data import Dataset, random_split
 from PIL import Image
 import torch
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, List
 import kagglehub
 from dataclasses import dataclass
 import os
+import torch
 from pathlib import Path
-from typing import List
 import torch.nn.functional as F
-
+from transformers import DataCollator
 
 # region Utility functions
 
-def _compute_bbox_from_mask(mask_np: np.ndarray):
+def compute_bbox_from_mask(mask_np: np.ndarray):
     """
     Compute (x_min, y_min, width, height) in absolute pixel coords from a binary mask.
     Returns None if mask is empty.
@@ -28,7 +28,7 @@ def _compute_bbox_from_mask(mask_np: np.ndarray):
     return [int(x_min), int(y_min), int(width), int(height)]
 
 
-def resize_mask(mask, size=(800, 1060)) -> torch.Tensor:
+def resize_mask(mask: torch.Tensor, size: tuple = (800, 1060)) -> torch.Tensor:
     """
     Resize segmentation mask to given size using nearest neighbor interpolation.
 
@@ -55,7 +55,6 @@ def resize_mask(mask, size=(800, 1060)) -> torch.Tensor:
     mask_resized = F.interpolate(mask.float(), size=size, mode="nearest")
     mask_bin = (mask_resized > 0).long()  # Binarize
     return mask_bin.squeeze()  # -> (H_new, W_new)
-
 
 #endregion
 
@@ -222,7 +221,7 @@ class FishSegmentDataCollator:
         meta = []
         bboxes = []
         for mask, cls_name in zip(seg_masks, class_names):  # masks = list of numpy or torch 2D arrays
-            bbox = _compute_bbox_from_mask(mask.cpu().numpy())
+            bbox = compute_bbox_from_mask(mask.cpu().numpy())
             if bbox is None:
                 continue
             bboxes.append(bbox)
@@ -266,6 +265,7 @@ def load_fish_dataset():
     """
     dataset_url = "crowww/a-large-scale-fish-dataset"
     base_path = os.path.join(kagglehub.dataset_download(dataset_url), "Fish_Dataset", "Fish_Dataset")
+    print("Dataset path is:", base_path)
     class_names = get_fish_classes()  # Add "N/A" for background class
     class_ids = list(range(len(class_names)))
 

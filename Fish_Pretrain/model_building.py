@@ -6,6 +6,7 @@ import torch
 from transformers import Trainer, TrainingArguments
 from Fish_Pretrain.dataset_loading import load_fish_datasets_all, get_fish_classes, FishSegmentDataCollator, resize_mask
 from Fish_Pretrain.decoder_head import FishSegmentBBoxHead, FishSegmentClassifier, FishSegmentationHead
+from Fish_Pretrain.utils import backup_model_to_hub
 from torch.nn import functional as F
 from torch import nn
 from transformers.utils import ModelOutput
@@ -20,9 +21,7 @@ DEFAULT_LOSS_WEIGHTS = dict(cls=2.0, seg=1.0, box=1.0)  # weights for classifica
 # Close all warnings
 warnings.filterwarnings("ignore")
 
-
 # region Model Definition
-
 @dataclass
 class FishSegmentationModelOutput(ModelOutput):
     """
@@ -45,7 +44,6 @@ class FishSegmentModelConfig(PretrainedConfig):
         if num_labels is not None:
             self.num_labels = num_labels
 
-
 class FishSegmentationModel(PreTrainedModel):
     config_class = FishSegmentModelConfig
 
@@ -57,8 +55,9 @@ class FishSegmentationModel(PreTrainedModel):
         super().__init__(config)
         # get base model from huggingface
         model = AutoModelForImageSegmentation.from_pretrained(
-            "facebook/detr-resnet-50-panoptic", device_map="auto", dtype="auto"
+            "facebook/detr-resnet-50-panoptic",
         )
+        # remove  device_map="auto", dtype="auto" to avoid loading issue
         classes = get_fish_classes()
         num_classes = len(classes)
         model.config.num_labels = num_classes  # Update this based on your dataset
@@ -169,38 +168,25 @@ except ValueError:
 # endregion
 
 
-# region Trainer Definition (TODO)
-# ---------------------------
-# Custom Trainer
-# ---------------------------
-class MultiTaskTrainer(Trainer):
-    def __init__(self, loss_weights=None, *args, **kwargs):
-        super(MultiTaskTrainer, self).__init__(*args, **kwargs)
-        if loss_weights is None:
-            loss_weights = DEFAULT_LOSS_WEIGHTS
-        self.loss_weights = loss_weights
-
-
-# endregion
-
 def train_model():
     train_size, test_size = 0.75, 0.2
     config = FishSegmentModelConfig(model_name="FishSegmentationModel", hidden_ch=256)
     training_args = TrainingArguments(
         output_dir='./models',
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
+        per_device_train_batch_size=32,
+        per_device_eval_batch_size=32,
         label_names=["class_ids", "segmentation_mask", "bboxes"],
         do_train=True,  # train_set
         do_eval=True,  # val_set
         do_predict=True,  # test_set
         eval_strategy="steps",
         weight_decay=1e-2,
-        num_train_epochs=20,  # 20 epoch for training
-        learning_rate=2e-4,  # specify learning rate
+        num_train_epochs=15,  # 20 epoch for training
+        learning_rate=5e-4,  # specify learning rate
     )
 
     model = FishSegmentationModel(model_name="fish_segmentation_model", config=config).to(DEVICE)
+
     train_set, eval_set, test_set = load_fish_datasets_all(train_size, test_size)
 
     processor = AutoImageProcessor.from_pretrained("facebook/detr-resnet-50-panoptic", use_fast=True)
@@ -218,25 +204,7 @@ def train_model():
     config.save_pretrained('./models/final_model')
 
     repo_id = "FriedParrot/fish-segmentation-model"
-
-    # push model to hub
-    config.push_to_hub(
-        repo_id=repo_id,
-        private=False,
-        commit_message="Add config for FishSegmentationModel"
-    )
-
-    processor.push_to_hub(
-        repo_id=repo_id,
-        private=False,
-        commit_message="Add image processor"
-    )
-
-    model.push_to_hub(
-        repo_id=repo_id,
-        private=False,
-        commit_message="Add trained FishSegmentationModel"
-    )
+    backup_model_to_hub(repo_id, config, model, processor, private=False)
     print("Model training and saving completed.")
 
 def main():
