@@ -10,16 +10,16 @@ Above 2 full-trained models can be found at 🤗:
 1. https://huggingface.co/FriedParrot/fish-segmentation-model
 2. https://huggingface.co/FriedParrot/fish-segmentation-simple
 
-Both models are trained by [A Large Scale Fish Dataset](https://www.kaggle.com/datasets/crowww/a-large-scale-fish-dataset). For convenience, I made this model available on [hugging face]().
+Both models are trained by [A Large Scale Fish Dataset](https://www.kaggle.com/datasets/crowww/a-large-scale-fish-dataset). 
+
+Note that for the convenience, I also made a copy version for this dataset available on [hugging face](https://huggingface.co/datasets/FriedParrot/a-large-scale-fish-dataset).
 
 > [!note]  
 > Actually at start I just wanted to fine-tune the DETR model for this task, but I made it using the resnet-50 backbone to do it while studying components  (I admit it complicated the problem😅). So finally I implemented both😊. 
 >
 > The first approach may seem more complicated, but it provides a comprehensive
 > view of the different components available in Hugging Face. By exploring these details, the guide becomes more in-depth and accessible for newcomers(including myself) who want to understand the full workflow and flexibility of the library, also it's friendly for those who used to making models on pytorch ecosystem.
->
 > 
->
 > For those who looking for fine-tune the DETR model directly, or just using pretrained-model, you can also find fine-tuning code for DETR at `Fish_Simple` Folder. 
 
 
@@ -62,6 +62,10 @@ run `Fish_Pretrain > model_evaluation.py` or `Fish_Finetune > model_evaluation.p
 
 ![batch0_sample0.png](Fish_Pretrain/img/batch0_sample0.png)
 
-Since this is not a model for very high accuracy training task, I didn't evaluate its classification accuracy. But the model can give reasonable classification result (it only misclassifies about 8% to 15% samples).
+Since this is not a model for very high accuracy training task, I didn't evaluate its accuracy very in detail. 
 
+Actually, the classification performance of first model is really bad at classification, segmentation and bounding box prediction. 
+
+(Even if the result looks reasonable, Actually the classification accuracy is only 63% on random set, but you can modify the loss weight of classification for better result).
+ 
 ### Example of Second model

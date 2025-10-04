@@ -1,7 +1,6 @@
 import numpy as np
 from torch.utils.data import Dataset, random_split
 from PIL import Image
-import torch
 from typing import Optional, Dict, Union, List
 import kagglehub
 from dataclasses import dataclass
@@ -9,7 +8,6 @@ import os
 import torch
 from pathlib import Path
 import torch.nn.functional as F
-from transformers import DataCollator
 
 # region Utility functions
 
