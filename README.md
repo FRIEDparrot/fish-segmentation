@@ -70,7 +70,7 @@ Actually, the classification performance of first model is terrible at classific
 
 (Note you can modify the loss weight of classification for better result).
 
-Reference Classification Accuracy :  79.33% (714/900) (not full test set)
+Reference Classification Accuracy :  79.33% (714/900) (the set used for test is not entirely test set)
 
 ### Example of Second model
 
