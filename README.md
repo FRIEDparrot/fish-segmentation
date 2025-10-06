@@ -60,12 +60,16 @@ run `Fish_Pretrain > model_evaluation.py` or `Fish_Finetune > model_evaluation.p
 
 >  since the first model decrease mask resolution, so the mask is not very accurate: 
 
+training platform : RTX4060 8GB VRAM + cu126
+
 ![batch0_sample0.png](Fish_Pretrain/img/batch0_sample0.png)
 
 Since this is not a model for very high accuracy training task, I didn't evaluate its accuracy very in detail. 
 
-Actually, the classification performance of first model is really bad at classification, segmentation and bounding box prediction. 
+Actually, the classification performance of first model is terrible at classification ($\text{Accuracy} \approx 65\% \sim 79.33\% (714/900)$), segmentation and bounding box prediction.
 
 (Even if the result looks reasonable, Actually the classification accuracy is only 63% on random set, but you can modify the loss weight of classification for better result).
  
 ### Example of Second model
+
+training platform : RTX4090 + 48GB VRAM + cu128 

@@ -71,18 +71,17 @@ class FishCollator:
         for f in features:
             # prepare annotations from masks
             bbox = compute_bbox_from_mask(np.array(f["mask"]))
-            area = int(torch.prod(torch.tensor(bbox[2:])))
+            area = float(bbox[2] * bbox[3])  # absolute pixel area
             ann: AnnotationType = {
-                "image_id": torch.tensor(f["class_id"]),
+                "image_id": torch.tensor(f["image_id"]),
                 "annotations": [
                     {
-                        "image_id": torch.tensor(f["class_id"]),
+                        "image_id": torch.tensor(f["image_id"]),  # not set to class_id, It breaks the matching logic inside the loss computation (Hungarian matching).
                         "category_id": torch.tensor(f["class_id"]),
                         "bbox": torch.tensor(bbox),  # only gives bbox and area
                         "area": torch.tensor(area),
-                        "segmentation": [
-                            [bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3],
-                             bbox[0], bbox[1] + bbox[3]]],  # COCO polygon format
+                        # for COCO polygon format,
+                        # "segmentation": [[bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3], bbox[0], bbox[1] + bbox[3]]],
                         "iscrowd": torch.tensor([0]),
                     }
                 ]
@@ -94,7 +93,7 @@ class FishCollator:
                              return_segmentation_masks=False,  # no mask info
                              format=AnnotationFormat.COCO_DETECTION,
                              return_tensors="pt")
-        # since out now have no masks, we need to add them back
+        # since out now have no masks, we need to manually inject them back
         masks = [f["mask"] for f in features]
 
         for i, mask in enumerate(masks):
@@ -137,16 +136,21 @@ def load_dataset(train_size: float = 0.8, seed: int = 42):
 
 def train_model():
     # just use pretrained DETR model and fine-tune it
-    config = DetrConfig(
-        model_name="Fish_Segmentation_Model_Fine_Tuning_DETR",
-        num_labels=9
+    base_model_name = "facebook/detr-resnet-50-panoptic"
+    config = DetrConfig.from_pretrained(
+        base_model_name,  # **this is confi from pretrained DETR model**
+        num_labels=9  # use number of Fish species (no need to +1 for background in DETR segmentation)
     )
+    config.id2label = {i: cls for i, cls in enumerate(get_fish_classes())}
+    config.label2id = {v: k for k, v in config.id2label.items()}
+    config.model_name="Fish_Segmentation_Model_Fine_Tuning_DETR"
+
     model = DetrForSegmentation.from_pretrained(
-        "facebook/detr-resnet-50-panoptic",  # number of fish species
+        base_model_name,  # number of fish species
         ignore_mismatched_sizes=True,
         config=config,
     )
-    processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+    processor = DetrImageProcessor.from_pretrained(base_model_name)
 
     train_dataset, val_dataset = load_dataset(train_size=0.8, seed=42)
     collator = FishCollator(processor=processor)
@@ -155,11 +159,18 @@ def train_model():
         output_dir="./models",
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
-        num_train_epochs=15,
+        num_train_epochs=20,           # 15 - 20
         remove_unused_columns=False,   # This must be specified
         eval_strategy="steps",
-        learning_rate=1e-4,
-        weight_decay=0.01
+        learning_rate=5e-5,   # for a larger model, consider using a smaller learning rate is better.
+        weight_decay=0.025,
+        eval_steps=500,
+        save_steps=500,
+        load_best_model_at_end=True,
+        warmup_steps=500,
+        lr_scheduler_type="cosine",
+        logging_dir="./logs",
+        logging_steps=500,
     )
 
     trainer = Trainer(
@@ -170,6 +181,11 @@ def train_model():
         data_collator=collator,
     )
     trainer.train()
+    """
+    What we expect : 
+    except the background class[10], we have only 1 bbox per image, and then masks should also be 
+    predicted correctly.  
+    """
     trainer.save_model('./models/final_model')
     processor.save_pretrained('./models/final_model')
     config.save_pretrained('./models/final_model')
@@ -178,6 +194,7 @@ def train_model():
     # push model to hub
     backup_model_to_hub(repo_id, config, model, processor)
     print("Model training and saving completed.")
+
 
 
 if __name__ == "__main__":

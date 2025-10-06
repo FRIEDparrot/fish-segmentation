@@ -80,7 +80,7 @@ def push_to_hub():
     """
     only a dataset dict or dataset can be pushed to hub
     """
-    dataset = hf_load_dataset("./fish_dataset_hf")  # load from local disk
+    dataset = hf_load_dataset("./fish_dataset_hf")  # load from local disk (this is a datadict)
     dataset.push_to_hub("FriedParrot/a-large-scale-fish-dataset", private=True)  # push the dataset to hub
 
 if __name__ == "__main__":
