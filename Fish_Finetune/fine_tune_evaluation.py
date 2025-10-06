@@ -14,9 +14,9 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #region Model Loading and Summary
 def load_model(model_path: str):
-    # config = AutoConfig.from_pretrained(model_path, local_files_only=True)
-    # model = DetrForSegmentation.from_pretrained(model_path, config=config, local_files_only=True)
-    # processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
+    config = AutoConfig.from_pretrained(model_path, local_files_only=True)
+    model = DetrForSegmentation.from_pretrained(model_path, config=config, local_files_only=True)
+    processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
 
     return model, processor, config
 
@@ -50,16 +50,18 @@ def move_batch_to_device(batch, device):
 def evaluate_model(
         model, processor, batch_size: int = 1, max_vis: int = 2, save_dir: str = None
     ):
-    _, test_set = load_dataset(train_size=0.8)
+    _, test_set = load_dataset(train_size=0.95)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=2,
                              collate_fn=FishCollator(processor), pin_memory=True if torch.cuda.is_available() else False)
     classes = get_fish_classes()
     model.eval()
     model.to(device)
+
     with torch.no_grad():
         show_num = 0
-        for batch in test_loader:
+        correct = 0
+        for b_idx, batch in enumerate(test_loader):
             # since there is nested structure in inputs, only pin_memory for tensors is not enough
             inputs = move_batch_to_device(batch, device)
             outputs = model(**inputs)
@@ -71,64 +73,67 @@ def evaluate_model(
             class_pred = outputs["logits"].argmax(-1)  # (B, num_queries)
             pred_masks = outputs["pred_masks"].sigmoid()  # (B, num_queries, H, W)
             pred_bboxes = outputs["pred_boxes"]  # (B, num_queries, 4)
-
             if show_num >= max_vis:
-                break
-            batch_size = images.shape[0]
+                print("calculating accuracy ...", "batch: ", b_idx, "/", len(test_loader))
+
+            batch_size = images.shape[0]   # the bbox is predicted from mask
+            # calculate the classification accuracy -> gt : ground truth
             for i in range(batch_size):
-                show_num += 1
-                if show_num >= max_vis:
-                    break
-
                 img = images[i]  # shape [3, H, W]
-                label = labels[i]  # This should be a dict with keys: 'class_labels', 'masks', 'boxes'
-
-                # --- Handle class ---
-                class_ids = label['class_labels']
+                label = labels[i] # predicted labels
+                # --- Handle predicted class, masks and bboxes (they should all be 1)---
+                class_ids = label['class_labels']  # input class ids
+                masks = label['masks']  # [B, 800, 1060]
+                bboxes = label['boxes']  # NOTE : the bbox is normalized
                 if len(class_ids) > 1:
                     print(f"Warning: Multiple classes detected in sample {i}, using the first.")
-                gt_label = class_ids[0] if len(class_ids) > 0 else None
-
-                # --- Handle mask ---
-                masks = label['masks']
                 if len(masks) > 1:
                     print(f"Warning: Multiple masks detected in sample {i}, using the first.")
-                gt_mask = masks[0] if len(masks) > 0 else None
-
-                # --- Handle bbox ---
-                bboxes = label['boxes']
                 if len(bboxes) > 1:
                     print(f"Warning: Multiple boxes detected in sample {i}, using the first.")
+
+                gt_label = class_ids[0] if len(class_ids) > 0 else None
+                gt_mask = masks[0] if len(masks) > 0 else None
                 gt_box = bboxes[0] if len(bboxes) > 0 else None
 
                 # --- Prediction Extraction ---
                 valid_idx = class_pred[i] != model.config.num_labels
                 filtered_classes = class_pred[i][valid_idx]
-                filtered_masks = pred_masks[i][valid_idx]
+                filtered_masks = (pred_masks[i][valid_idx] > 0.5).long()   # for sigmoid function, we need to compare to 0.5
                 filtered_boxes = pred_bboxes[i][valid_idx]
 
-                pred_label = [classes[c] for c in
-                              filtered_classes.cpu().numpy()] if filtered_classes.nelement() > 0 else []
+                # collate predicted results
+                pred_label = filtered_classes[0] if filtered_classes.nelement() > 0 else None
+                if pred_label == gt_label:
+                    correct += 1
+
+                if show_num >= max_vis:
+                    continue
+                else:
+                    show_num += 1
                 pred_mask = filtered_masks[0] if filtered_masks.nelement() > 0 else None
                 pred_box = filtered_boxes[0] if filtered_boxes.nelement() > 0 else None
-
+                # get label names
                 gt_label_name = classes[gt_label] if gt_label is not None else "N/A"
-                pred_label_name = pred_label[0] if pred_label else "N/A"
-                print(f"GT Label: {gt_label_name}, Pred Labels: {pred_label}")
-
+                pred_label_name = classes[pred_label] if pred_label else "N/A"
                 visualize_sample_comparison(
                     img.cpu(),
                     gt_mask.cpu(), pred_mask.cpu(),
                     gt_label_name, pred_label_name,
                     gt_box.cpu(), pred_box.cpu(),
-                    save_path=save_dir
+                    save_path=os.path.join(save_dir, f"b{b_idx}_s{i}.png") if save_dir else None,
+                    bbox_mode="center",
                 )
+        # compute accuracy
+        total = len(test_set)
+        accuracy = correct / total # total number of samples in the test set
+        print(f"Classification Accuracy on Test Set: {accuracy*100:.2f}% ({correct}/{total})")
 
 def main():
     model_path: str = "./models/final_model"
     model, processor, config = load_model(model_path)
     # summary_model(model)
-    evaluate_model(model, processor, max_vis=5)
+    evaluate_model(model, processor, max_vis=5, save_dir="./img")
 
 if __name__ == "__main__":
     main()

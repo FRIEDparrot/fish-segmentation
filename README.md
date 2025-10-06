@@ -66,10 +66,18 @@ training platform : RTX4060 8GB VRAM + cu126
 
 Since this is not a model for very high accuracy training task, I didn't evaluate its accuracy very in detail. 
 
-Actually, the classification performance of first model is terrible at classification ($\text{Accuracy} \approx 65\% \sim 79.33\% (714/900)$), segmentation and bounding box prediction.
+Actually, the classification performance of first model is terrible at classification, segmentation and bounding box prediction.
 
-(Even if the result looks reasonable, Actually the classification accuracy is only 63% on random set, but you can modify the loss weight of classification for better result).
- 
+(Note you can modify the loss weight of classification for better result).
+
+Reference Classification Accuracy :  79.33% (714/900) (not full test set)
+
 ### Example of Second model
 
 training platform : RTX4090 + 48GB VRAM + cu128 
+
+This model is fine-tuned from `detr-resnet-50-panoptic` model, so the performance is very good. 
+
+![img.png](Fish_Finetune/img/img.png)
+
+Reference Classification Accuracy :  100.00% (450/450) 

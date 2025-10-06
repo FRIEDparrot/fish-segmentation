@@ -97,7 +97,11 @@ class FishCollator:
                              return_tensors="pt")
         # since out now have no masks, we need to manually inject them back
         masks = [f["mask"] for f in features]
-
+        """
+        HINT : the "bbox" and "area" are used to compute 'boxes' term
+            in that case "boxes" term is normalized in DETR input, 
+            also, it will be converted from corner format to center format. 
+        """
         for i, mask in enumerate(masks):
             # resize mask to the size of out['labels'][i]['size']
             target_size = tuple(out['labels'][i]['size'])

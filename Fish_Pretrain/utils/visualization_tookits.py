@@ -36,11 +36,20 @@ def _bbox_is_normalized(bbox: torch.Tensor, height: int, width: int) -> bool:
     # Heuristic: if all coords <= 1.5 treat as normalized
     return torch.all(bbox <= 1.5).item()
 
-def _prepare_bbox(bbox: torch.Tensor, height: int, width: int) -> Tuple[float, float, float, float]:
+def _prepare_bbox(bbox: torch.Tensor, height: int, width: int, bbox_mode="corner") -> Tuple[float, float, float, float]:
     """Return bbox in pixel coordinates (x,y,w,h). Accept either normalized or pixel bbox."""
     if bbox.numel() != 4:
         return 0.0, 0.0, 0.0, 0.0
-    x, y, w, h = bbox.float()
+    if bbox_mode == "corner":
+        x, y, w, h = bbox.float()
+    elif bbox_mode == "center":
+        cx, cy, bw, bh = bbox.float()
+        x = cx - bw / 2
+        y = cy - bh / 2
+        w = bw
+        h = bh
+    else:
+        raise ValueError(f"Unsupported bbox_mode: {bbox_mode}, must be 'corner' or 'center'")
     if _bbox_is_normalized(bbox.float(), height, width):
         return x.item() * width, y.item() * height, w.item() * width, h.item() * height
     return x.item(), y.item(), w.item(), h.item()
@@ -74,7 +83,8 @@ def visualize_sample_comparison(
     cmap_gt: Tuple[float, float, float] = (1.0, 0.0, 0.0),  # red
     cmap_pred: Tuple[float, float, float] = (0.0, 0.7, 1.0),  # cyan/blue
     show: bool = True,
-    title_prefix: str = "Sample"
+    title_prefix: str = "Sample",
+    bbox_mode="corner",
 ):
     """Create a high-quality side-by-side figure.
 
@@ -115,7 +125,7 @@ def visualize_sample_comparison(
             rect = plt.Rectangle((x, y), w_box, h_box, linewidth=2, edgecolor='yellow', facecolor='none')
             axes[0].add_patch(rect)
     elif gt_bbox is not None:
-        gx, gy, gw, gh = _prepare_bbox(gt_bbox, H, W)
+        gx, gy, gw, gh = _prepare_bbox(gt_bbox, H, W, bbox_mode=bbox_mode)
         rect = plt.Rectangle((gx, gy), gw, gh, linewidth=2, edgecolor='yellow', facecolor='none')
         axes[0].add_patch(rect)
     axes[0].axis('off')
@@ -130,7 +140,7 @@ def visualize_sample_comparison(
     metric_line = (" | ".join(metrics_str)) if metrics_str else ""
     axes[1].set_title(f"Pred: {pred_label_name}\n{metric_line}")
     if pred_bbox is not None:
-        px, py, pw, ph = _prepare_bbox(pred_bbox, H, W)
+        px, py, pw, ph = _prepare_bbox(pred_bbox, H, W, bbox_mode=bbox_mode)
         rect = plt.Rectangle((px, py), pw, ph, linewidth=2, edgecolor='lime', facecolor='none')
         axes[1].add_patch(rect)
     axes[1].axis('off')
