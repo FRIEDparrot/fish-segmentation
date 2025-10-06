@@ -249,10 +249,16 @@ class FishSegmentDataCollator:
 # endregion
 
 def get_fish_classes():
-    dataset_url = "crowww/a-large-scale-fish-dataset"
-    base_path = os.path.join(kagglehub.dataset_download(dataset_url), "Fish_Dataset", "Fish_Dataset")
-    return [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
+    """
+    Note : Firstly I planned to use sorted directory names as class labels, but the order seems arbitrary
+        and dataset order is uploaded using another fixed order (but the names of image are correct).
 
+        So for the consistency of models and dataset, we use fixed class name sequence here.
+    Returns:
+    """
+    return ['Trout', 'Shrimp', 'Gilt-Head Bream',
+            'Hourse Mackerel', 'Red Mullet', 'Striped Red Mullet',
+            'Red Sea Bream', 'Black Sea Sprat', 'Sea Bass' ]
 
 def load_fish_dataset():
     """

@@ -37,12 +37,14 @@ class FishSegmentDataSet(Dataset):
             for img_path, mask_path in zip(img_paths, mask_paths):
                 img_id = os.path.splitext(img_path)[0]
                 mask_id = os.path.splitext(mask_path)[0]
+                class_id = get_fish_classes().index(class_name)
+
                 if img_id != mask_id:
                     raise ValueError(f"Image and mask file names must match: {img_id} vs {mask_id}")
                 self.items.append(dict(img_path=img_path,
                                        mask_path=mask_path,
                                        class_name=class_name,
-                                       class_id=idx))
+                                       class_id=class_id))
 
     def __len__(self):
         return len(self.items)

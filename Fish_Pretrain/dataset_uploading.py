@@ -62,8 +62,8 @@ def convert_to_hf_dataset(dataset: FishSegmentDataSet) -> DatasetDict:
     train_set, val_set, test_set = random_split(
         dataset, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(r)
     )
-    # Using generator to avoid memory leaks
 
+    # Using generator to avoid memory leaks
     data_dict["train"] = construct_hf_dataset_from_subset(train_set, features, Split.TRAIN)
     data_dict["validation"] = construct_hf_dataset_from_subset(val_set, features, Split.VALIDATION)
     data_dict["test"] = construct_hf_dataset_from_subset(test_set, features, Split.TEST)
@@ -71,10 +71,12 @@ def convert_to_hf_dataset(dataset: FishSegmentDataSet) -> DatasetDict:
 
 def build_datasets():
     dataset = load_dataset(train_size=1.0)[0]  # load the full dataset
-    print("converting to hugging face dataset...")
+    print(dataset[0])
+
     # convert to DatasetDict
-    hf_dataset = convert_to_hf_dataset(dataset)
-    hf_dataset.save_to_disk("./fish_dataset_hf")  # save to local disk for backup
+    # hf_dataset = convert_to_hf_dataset(dataset)
+    # hf_dataset.save_to_disk("./fish_dataset_hf")  # save to local disk for backup
+
 
 def push_to_hub():
     """
@@ -84,5 +86,5 @@ def push_to_hub():
     dataset.push_to_hub("FriedParrot/a-large-scale-fish-dataset", private=True)  # push the dataset to hub
 
 if __name__ == "__main__":
-    # build_datasets()
-    push_to_hub()
+    build_datasets()
+    # push_to_hub()

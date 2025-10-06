@@ -1,4 +1,3 @@
-from transformers import AutoProcessor
 from Fish_Pretrain import (
     FishSegmentationModel, FishSegmentModelConfig,
     load_fish_datasets_all, FishSegmentDataCollator, get_fish_classes,
@@ -9,14 +8,16 @@ import os
 import torch
 from Fish_Pretrain.utils import visualize_sample_comparison
 from torchinfo import summary
+from transformers import AutoProcessor
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #region Model Loading and Summary
-def load_models():
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    model_path = "./models/final_model"
+def load_models(model_path):
     config = FishSegmentModelConfig.from_pretrained(model_path, local_files_only=True)
     model = FishSegmentationModel.from_pretrained(model_path, config=config, local_files_only=True)
     processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
+
     return model, config, processor
 
 def print_model_summary(model):
@@ -84,7 +85,8 @@ def test_fish_segmentation_model(
         print(f"Test Classification Accuracy: {acc*100:.2f}% ({correct}/{len(test_set)})")
 
 def main():
-    model, config, processor = load_models()
+    model_path="./models/final_model"
+    model, config, processor = load_models(model_path)
     print_model_summary(model)
     test_fish_segmentation_model(model, processor, batch_size=8, max_vis=2, save_dir='./img')
 
